@@ -73,7 +73,7 @@ def run_agent(url_entry: dict, name: str) -> dict:
 
 def run(url_map: list[dict], name: str) -> list[dict]:
     print(f"\n  Firing {len(url_map)} parallel TinyFish Agent calls...")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         results = list(executor.map(lambda u: run_agent(u, name), url_map))
     successful = sum(1 for r in results if r["extracted"])
     print(f"\n  Completed: {successful}/{len(url_map)} pages extracted")

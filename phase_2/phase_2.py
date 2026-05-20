@@ -5,6 +5,7 @@ import subprocess
 import phase_2_search
 import phase_2_classify
 import phase_2_rank
+import phase_2_validate
 
 # ── INPUT — change these to run for different people ─────────────────────────
 NAME    = "Sun Xiushun"
@@ -26,16 +27,21 @@ if __name__ == "__main__":
     print(f"  Company: {COMPANY or 'Not provided'}")
     print(f"{'═'*75}")
 
-    # Step 1 — search
+   # Step 1 — Search raw endpoints
     raw_results = phase_2_search.run(NAME, COMPANY)
 
-    # Step 2 — classify
-    url_map = phase_2_classify.run(raw_results)
+    # Step 2 — Validate entities (Crucial Link!)
+    # Filters out mixed-identity or noisy search anomalies early on
+    valid_results, rejected_results = phase_2_validate.run(raw_results, NAME, COMPANY)
+
+    # Step 3 — Classify ONLY the validated search chunks
+    url_map = phase_2_classify.run([valid_results])
+    
 
     # Step 3 — rank
     ranked = phase_2_rank.run(url_map, top_n=20)
     phase_2_rank.display(ranked)
-
+    
     # Save output for Phase 3
     output = {
         "name":    NAME,

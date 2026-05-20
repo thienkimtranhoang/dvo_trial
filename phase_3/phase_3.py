@@ -14,7 +14,7 @@ def run(phase2_output_path: str):
     name    = phase2_data["name"]
     company = phase2_data.get("company", "")
     url_map = phase2_data["url_map"]
-
+    
     print(f"\n{'═'*75}")
     print(f"  PHASE 3 — Parallel Scraping & Classified Extraction")
     print(f"  Name   : {name}")
