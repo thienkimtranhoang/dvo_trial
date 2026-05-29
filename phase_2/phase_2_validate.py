@@ -230,14 +230,12 @@ def _reconcile(
         else:
             return heur_valid, heur_conf, f"[agree] heuristic: {heur_reason}", "llm+heuristic"
 
-    # Disagree — use confidence to arbitrate
-    llm_rank  = CONF_RANK.get(llm_conf,  0)
-    heur_rank = CONF_RANK.get(heur_conf, 0)
-
-    if llm_rank >= 3:        # LLM is high-confidence — trust it
-        return llm_valid,  llm_conf,  f"[llm-wins]  llm: {llm_reason} | heur: {heur_reason}", "llm+heuristic"
-    if heur_rank >= 3:       # Heuristic is high-confidence — trust it over uncertain LLM
-        return heur_valid, heur_conf, f"[heur-wins] heur: {heur_reason} | llm: {llm_reason}", "llm+heuristic"
+    if not llm_valid and not heur_valid:
+        # Both reject — pick higher-confidence reason
+        if CONF_RANK.get(llm_conf, 0) >= CONF_RANK.get(heur_conf, 0):
+            return False, llm_conf,  f"[agree-reject] llm: {llm_reason}", "llm+heuristic"
+        else:
+            return False, heur_conf, f"[agree-reject] heuristic: {heur_reason}", "llm+heuristic"
 
     # Both medium/low and disagree → conservative reject
     return False, "low", f"[conflict] llm({llm_conf})={llm_valid}: {llm_reason} | heur({heur_conf})={heur_valid}: {heur_reason}", "llm+heuristic"
