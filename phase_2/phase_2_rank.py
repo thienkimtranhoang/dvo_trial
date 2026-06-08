@@ -1,8 +1,8 @@
 from collections import defaultdict
-from config import ATTRIBUTES
+import sys, os; sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..")); from config import ATTRIBUTES, ORG_ATTRIBUTE_KEYWORDS
 
 
-def run(url_map: dict, top_n: int = 20) -> list[dict]:
+def run(url_map: dict, top_n: int = 20, org_mode: bool = False) -> list:
     print(f"\n  Ranking by attribute coverage, taking top {top_n}...")
 
     ranked = [
@@ -13,12 +13,22 @@ def run(url_map: dict, top_n: int = 20) -> list[dict]:
     ranked.sort(key=lambda x: x["coverage"], reverse=True)
 
     # ── Fix 1: Max 2 URLs per domain ─────────────────────────────────────────
+    # Collapse only generic subdomain prefixes — www, en, m, cdn, static, assets
+    GENERIC_PREFIXES = {"www", "en", "m", "cdn", "static", "assets", "media"}
+
+    def normalise_domain(domain: str) -> str:
+        parts = domain.split(".")
+        if len(parts) > 1 and parts[0] in GENERIC_PREFIXES:
+            return ".".join(parts[1:])
+        return domain
+
     domain_count = defaultdict(int)
     deduped = []
     for r in ranked:
-        domain = r["url"].split("/")[2] if "/" in r["url"] else r["url"]
-        if domain_count[domain] < 2:
-            domain_count[domain] += 1
+        full_domain = r["url"].split("/")[2] if "/" in r["url"] else r["url"]
+        norm_domain = normalise_domain(full_domain)
+        if domain_count[norm_domain] < 2:
+            domain_count[norm_domain] += 1
             deduped.append(r)
 
     # ── Fix 2: Ensure top 5 cover all 7 attributes at least twice ────────────
@@ -35,7 +45,8 @@ def run(url_map: dict, top_n: int = 20) -> list[dict]:
 
     # Check which attributes need more coverage in top 5
     counts = coverage_count(selected)
-    missing = [a for a in ATTRIBUTES if counts.get(a, 0) < 2]
+    attr_list = list(ORG_ATTRIBUTE_KEYWORDS.keys()) if org_mode else ATTRIBUTES
+    missing = [a for a in attr_list if counts.get(a, 0) < 2]
 
     if missing:
         print(f"  Top 5 missing coverage for: {missing} — boosting...")
@@ -58,7 +69,7 @@ def run(url_map: dict, top_n: int = 20) -> list[dict]:
     return final
 
 
-def display(ranked: list[dict]):
+def display(ranked: list, org_mode: bool = False):
     print(f"\n{'═'*75}")
     print(f"  PHASE 2 RESULTS — Top {len(ranked)} URLs")
     print(f"{'═'*75}\n")
@@ -77,7 +88,7 @@ def display(ranked: list[dict]):
     for r in ranked:
         for a in r["attributes"]:
             attr_counts[a] += 1
-    for attr in ATTRIBUTES:
+    for attr in (list(ORG_ATTRIBUTE_KEYWORDS.keys()) if org_mode else ATTRIBUTES):
         count = attr_counts.get(attr, 0)
         print(f"  {attr:<25} {'█' * count} ({count} URLs)")
     print(f"{'═'*75}")

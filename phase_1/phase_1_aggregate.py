@@ -112,10 +112,30 @@ def aggregate(extractions: list, name: str) -> dict:
             print(f"    Found: {nat} | {fmt_source(e.get('source', ''))}")
 
     if nat_pool:
-        counter  = Counter(n[0] for n in nat_pool)
-        best_nat = counter.most_common(1)[0][0]
-        nat_src  = next(n[1] for n in nat_pool if n[0] == best_nat)
-        print(f"  [Nationality] Winner: {best_nat} ({counter.most_common(1)[0][1]} votes) | {fmt_source(nat_src)} ✓")
+        # Weight citizenship statements higher than birthplace inferences
+        # Official government, major financial media, official profiles get 3x weight
+        CREDIBLE_DOMAINS = {
+            "forbes.com", "bloomberg.com", "gov.sg", "mfa.gov.sg",
+            "reuters.com", "ft.com", "wsj.com", "cnbc.com",
+            "parliament.gov", "gov.uk", "gov.au", "gov.nz",
+        }
+
+        weighted_counter = Counter()
+        src_map = {}
+        for nat, src in nat_pool:
+            weight = 1
+            src_lower = src.lower()
+            # Official or major financial source → 3x weight
+            if any(d in src_lower for d in CREDIBLE_DOMAINS):
+                weight = 3
+                print(f"    [+3x credible source] {nat} | {fmt_source(src)}")
+            weighted_counter[nat] += weight
+            if nat not in src_map:
+                src_map[nat] = src
+
+        best_nat = weighted_counter.most_common(1)[0][0]
+        nat_src  = src_map[best_nat]
+        print(f"  [Nationality] Winner: {best_nat} ({weighted_counter[best_nat]} weighted votes) | {fmt_source(nat_src)} ✓")
     else:
         best_nat = None
         nat_src  = None
@@ -191,8 +211,14 @@ def aggregate(extractions: list, name: str) -> dict:
         for inst, entries in inst_groups.items():
             unique_degrees = list(set(e["degree"] for e in entries))
 
-            if len(entries) >= 2 and len(unique_degrees) > 1:
-                # Multiple different degree names for same uni — ask LLM to resolve
+            # Normalise degrees before comparing — strip honours/distinctions
+            def normalise_deg(d):
+                return re.sub(r"\s*\(honours\)|\s*\(hons\)|\s*with honours|\s*with distinction", "", d, flags=re.IGNORECASE).strip()
+
+            normalised_unique = list(set(normalise_deg(d) for d in unique_degrees))
+
+            if len(entries) >= 2 and len(normalised_unique) > 1:
+                # Multiple genuinely different degree names for same uni — ask LLM to resolve
                 print(f"\n    [Education] Multiple degree names at {inst} — asking LLM to resolve...")
                 degrees_list = "\n".join(f"- {d}" for d in unique_degrees)
                 prompt = f"""Multiple sources describe {name}'s degree from {inst} differently:

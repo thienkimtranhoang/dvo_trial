@@ -1,0 +1,6 @@
+requests
+python-dotenv
+python-docx
+beautifulsoup4
+docxtpl
+Pillow
