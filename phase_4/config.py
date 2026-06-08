@@ -1,13 +1,4 @@
-# ── LOCAL LLM ─────────────────────────────────────────────────────────────────
-OLLAMA_URL   = "http://localhost:11434/api/chat"
-OLLAMA_MODEL = "qwen2.5:7b"  # change to qwen2.5:32b on AWS
-
-ATTRIBUTES = [
-    "BIOGRAPHY",
-    "FAMILY",
-    "INTERESTING_FACTS",
-    "ADVERSE_NEWS",
-    "GIVING",
-    "POTENTIAL_CONNECTORS",
-    "KEY_POSITIONS",
-]
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from config import *
+from config import OLLAMA_URL, OLLAMA_MODEL, TINYFISH_API_KEY, TAVILY_API_KEY, ATTRIBUTES

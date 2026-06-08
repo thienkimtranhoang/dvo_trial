@@ -1,209 +1,222 @@
 {
-  "name": "Sun Xiushun",
-  "company": "Winning International Group",
+  "name": "Mapletree Investments",
+  "company": null,
   "total": 20,
   "url_map": [
     {
-      "url": "https://www.caixinglobal.com/2026-02-26/in-depth-the-chinese-shipping-magnate-who-unlocked-simandou-102416939.html",
+      "url": "https://www.mapletree.com.sg/uploads/2025/01/full-version-en.pdf",
       "attributes": [
         "ADVERSE_NEWS",
         "BIOGRAPHY",
-        "FAMILY",
+        "DATE_OF_ESTABLISHMENT",
+        "DEMONSTRATED_INTERESTS",
         "GIVING",
-        "INTERESTING_FACTS",
-        "KEY_POSITIONS",
+        "GIVING5",
+        "OTHER_INTERESTING_FACTS",
         "POTENTIAL_CONNECTORS"
       ],
-      "coverage": 7
+      "coverage": 8
     },
     {
-      "url": "https://www.businesstimes.com.sg/international/global/singapore-firm-anchors-west-africas-mega-mine-inside-winning-internationals-simandou-play",
+      "url": "https://www.mapletree.com.sg/newsroom/mapletree-community-month-2025-raises-close-to-s24000-records-over-550-volunteer-and-learning-hours",
       "attributes": [
-        "ADVERSE_NEWS",
         "BIOGRAPHY",
-        "FAMILY",
+        "DATE_OF_ESTABLISHMENT",
+        "DEMONSTRATED_INTERESTS",
         "GIVING",
-        "INTERESTING_FACTS",
-        "KEY_POSITIONS",
+        "GIVING2",
+        "GIVING3",
+        "OTHER_INTERESTING_FACTS",
         "POTENTIAL_CONNECTORS"
       ],
-      "coverage": 7
+      "coverage": 8
     },
     {
-      "url": "https://www.bloomberg.com/news/articles/2025-11-11/shipowner-unlocks-china-rio-tinto-s-bet-on-africa-s-giant-mining-prize-simandou",
-      "attributes": [
-        "ADVERSE_NEWS",
-        "BIOGRAPHY",
-        "FAMILY",
-        "GIVING",
-        "INTERESTING_FACTS",
-        "KEY_POSITIONS",
-        "POTENTIAL_CONNECTORS"
-      ],
-      "coverage": 7
-    },
-    {
-      "url": "http://www.alcircle.com/news/transforming-guineas-mining-landscape-winning-internationals-simandou-move-115898",
+      "url": "https://www.sutd.edu.sg/admissions/undergraduate/financing-options-and-aid/financial-aid/study-bursary-awards/mapletree-paul-ma-kah-woh-bursary",
       "attributes": [
         "BIOGRAPHY",
-        "FAMILY",
+        "DATE_OF_ESTABLISHMENT",
         "GIVING",
-        "INTERESTING_FACTS",
-        "KEY_POSITIONS",
+        "GIVING5",
+        "OTHER_INTERESTING_FACTS",
         "POTENTIAL_CONNECTORS"
       ],
       "coverage": 6
     },
     {
-      "url": "https://www.winninggroup.com.sg/en/who-we-are/",
+      "url": "https://www.mapletreeindustrialtrust.com/about-us",
       "attributes": [
         "BIOGRAPHY",
-        "FAMILY",
-        "GIVING",
-        "INTERESTING_FACTS",
-        "KEY_POSITIONS",
+        "DATE_OF_ESTABLISHMENT",
+        "DEMONSTRATED_INTERESTS",
+        "GIVING4",
+        "OTHER_INTERESTING_FACTS",
         "POTENTIAL_CONNECTORS"
       ],
       "coverage": 6
     },
     {
-      "url": "https://oceancrew.org/index.php/news/the-shipping-mogul-who-carved-a-route-to-chinas-african-mining-prize",
+      "url": "https://www.sif.org.sg/Newsroom/Mapletree-Donates-S250000-to-Launch-Programme-with-Singapore-International-Foundation",
       "attributes": [
-        "ADVERSE_NEWS",
-        "FAMILY",
+        "DATE_OF_ESTABLISHMENT",
+        "DEMONSTRATED_INTERESTS",
         "GIVING",
-        "INTERESTING_FACTS",
-        "KEY_POSITIONS",
+        "GIVING3",
+        "GIVING4",
         "POTENTIAL_CONNECTORS"
       ],
       "coverage": 6
     },
     {
-      "url": "https://www.alamy.com/singapore-shipping-firm-winning-international-group-president-and-founder-sun-xiushun-the-company-has-turned-into-one-of-the-worlds-largest-suppliers-of-bauxite-an-ingredient-used-in-making-aluminium-singapore-press-via-ap-images-image532865995.html",
+      "url": "https://www.businesstimes.com.sg/keywords/mapletree-investments",
       "attributes": [
         "ADVERSE_NEWS",
+        "DEMONSTRATED_INTERESTS",
+        "OTHER_INTERESTING_FACTS",
+        "POTENTIAL_CONNECTORS"
+      ],
+      "coverage": 4
+    },
+    {
+      "url": "https://www.thetengcompany.com/scholarship",
+      "attributes": [
         "BIOGRAPHY",
-        "INTERESTING_FACTS",
-        "KEY_POSITIONS",
+        "DATE_OF_ESTABLISHMENT",
+        "DEMONSTRATED_INTERESTS",
+        "GIVING",
+        "GIVING5",
+        "POTENTIAL_CONNECTORS"
+      ],
+      "coverage": 6
+    },
+    {
+      "url": "https://grokipedia.com/page/Mapletree_Investments",
+      "attributes": [
+        "BIOGRAPHY",
+        "DATE_OF_ESTABLISHMENT",
+        "DEMONSTRATED_INTERESTS",
+        "GIVING",
+        "GIVING5",
+        "OTHER_INTERESTING_FACTS"
+      ],
+      "coverage": 6
+    },
+    {
+      "url": "https://www.globaldata.com/company-profile/mapletree-investments-pte-ltd",
+      "attributes": [
+        "BIOGRAPHY",
+        "DATE_OF_ESTABLISHMENT",
+        "GIVING4",
+        "OTHER_INTERESTING_FACTS",
         "POTENTIAL_CONNECTORS"
       ],
       "coverage": 5
     },
     {
-      "url": "https://www.tradewindsnews.com/dry-cargo/guinea-president-conte-honours-winning-s-sun-xiushun/2-1-482941",
-      "attributes": [
-        "ADVERSE_NEWS",
-        "BIOGRAPHY",
-        "FAMILY",
-        "KEY_POSITIONS"
-      ],
-      "coverage": 4
-    },
-    {
-      "url": "https://www.winninggroup.com.sg/en/what-we-do/",
-      "attributes": [
-        "ADVERSE_NEWS",
-        "GIVING",
-        "KEY_POSITIONS",
-        "POTENTIAL_CONNECTORS"
-      ],
-      "coverage": 4
-    },
-    {
-      "url": "https://www.sixthtone.com/news/1017905/how-china-unlocked-a-west-african-mine-to-reshape-the-global-iron-ore-trade",
-      "attributes": [
-        "ADVERSE_NEWS",
-        "BIOGRAPHY",
-        "KEY_POSITIONS",
-        "POTENTIAL_CONNECTORS"
-      ],
-      "coverage": 4
-    },
-    {
-      "url": "https://chinaglobaldialogue.com/2021/05/03/what-does-the-china-backed-mining-group-bring-to-the-community-the-impact-of-chinese-mining-companies-in-guinea/",
-      "attributes": [
-        "ADVERSE_NEWS",
-        "GIVING",
-        "KEY_POSITIONS",
-        "POTENTIAL_CONNECTORS"
-      ],
-      "coverage": 4
-    },
-    {
-      "url": "https://businesschina.org.sg/inaugural-prominent-business-leaders-dialogue-series-featuring-mr-sun-xiushun",
-      "attributes": [
-        "FAMILY",
-        "GIVING",
-        "KEY_POSITIONS"
-      ],
-      "coverage": 3
-    },
-    {
-      "url": "https://www.gevme.com/site/asbf-2025-winning-international-group",
-      "attributes": [
-        "GIVING",
-        "INTERESTING_FACTS",
-        "POTENTIAL_CONNECTORS"
-      ],
-      "coverage": 3
-    },
-    {
-      "url": "https://www.financialafrik.com/en/2019/04/10/guinea-smb-winning-consortium-launches-new-135-kilometer-railway/",
-      "attributes": [
-        "GIVING",
-        "KEY_POSITIONS",
-        "POTENTIAL_CONNECTORS"
-      ],
-      "coverage": 3
-    },
-    {
-      "url": "https://allafrica.com/stories/201903290781.html",
-      "attributes": [
-        "GIVING",
-        "KEY_POSITIONS",
-        "POTENTIAL_CONNECTORS"
-      ],
-      "coverage": 3
-    },
-    {
-      "url": "https://businesschina.org.sg/inaugural-prominent-business-leaders-dialogue-series-featuring-mr-sun-xiushun/",
-      "attributes": [
-        "GIVING",
-        "KEY_POSITIONS",
-        "POTENTIAL_CONNECTORS"
-      ],
-      "coverage": 3
-    },
-    {
-      "url": "https://www.riotinto.com/en/news/releases/2025/simandou-partners-celebrate-start-of-operations",
-      "attributes": [
-        "GIVING",
-        "KEY_POSITIONS",
-        "POTENTIAL_CONNECTORS"
-      ],
-      "coverage": 3
-    },
-    {
-      "url": "https://wap.asianmetal.com/interview/2015/interview_sunzhijunEn.shtml",
+      "url": "https://www.mapletreeprivatecapital.com/uploads/sites/8/2025/07/Overview.pdf",
       "attributes": [
         "BIOGRAPHY",
-        "KEY_POSITIONS"
+        "DATE_OF_ESTABLISHMENT",
+        "DEMONSTRATED_INTERESTS",
+        "OTHER_INTERESTING_FACTS",
+        "POTENTIAL_CONNECTORS"
+      ],
+      "coverage": 5
+    },
+    {
+      "url": "https://hub.ipe.com/asset-manager/mapletree-investments-pte-ltd-real-estate/424939.supplier",
+      "attributes": [
+        "BIOGRAPHY",
+        "DATE_OF_ESTABLISHMENT",
+        "GIVING4",
+        "GIVING5",
+        "OTHER_INTERESTING_FACTS"
+      ],
+      "coverage": 5
+    },
+    {
+      "url": "https://www.facebook.com/sgsmu/posts/-thanks-to-our-continued-partnership-with-mapletree-investments-were-pleased-to-/5448251665201318",
+      "attributes": [
+        "DEMONSTRATED_INTERESTS",
+        "GIVING",
+        "GIVING5",
+        "OTHER_INTERESTING_FACTS",
+        "POTENTIAL_CONNECTORS"
+      ],
+      "coverage": 5
+    },
+    {
+      "url": "https://amlnetwork.org/watchdog-database/real-estate-laundering/mapletree-investments-pte-ltd",
+      "attributes": [
+        "BIOGRAPHY",
+        "DATE_OF_ESTABLISHMENT",
+        "DEMONSTRATED_INTERESTS",
+        "GIVING",
+        "OTHER_INTERESTING_FACTS"
+      ],
+      "coverage": 5
+    },
+    {
+      "url": "https://www.prnewswire.com/news-releases/digital-realty-closes-1-billion-joint-venture-transaction-with-mapletree-300951046.html",
+      "attributes": [
+        "BIOGRAPHY",
+        "DATE_OF_ESTABLISHMENT",
+        "DEMONSTRATED_INTERESTS",
+        "OTHER_INTERESTING_FACTS",
+        "POTENTIAL_CONNECTORS"
+      ],
+      "coverage": 5
+    },
+    {
+      "url": "https://www.singaporetech.edu.sg/sites/default/files/Mapletree%27s%20Firm%20Friendship.pdf",
+      "attributes": [
+        "BIOGRAPHY",
+        "DEMONSTRATED_INTERESTS",
+        "GIVING",
+        "OTHER_INTERESTING_FACTS"
+      ],
+      "coverage": 4
+    },
+    {
+      "url": "https://news.smu.edu.sg/news/2021/03/17/growing-mapletree-singapores-real-estate-finance-company",
+      "attributes": [
+        "BIOGRAPHY",
+        "DATE_OF_ESTABLISHMENT",
+        "OTHER_INTERESTING_FACTS",
+        "POTENTIAL_CONNECTORS"
+      ],
+      "coverage": 4
+    },
+    {
+      "url": "https://en.wikipedia.org/wiki/Mapletree_Investments",
+      "attributes": [
+        "BIOGRAPHY",
+        "DATE_OF_ESTABLISHMENT",
+        "POTENTIAL_CONNECTORS"
+      ],
+      "coverage": 3
+    },
+    {
+      "url": "https://www.usgbc.org/organizations/mapletree-investments-pte-ltd",
+      "attributes": [
+        "BIOGRAPHY",
+        "DATE_OF_ESTABLISHMENT"
       ],
       "coverage": 2
     },
     {
-      "url": "https://www.classnk.or.jp/hp/pdf/publications/Publications_image/classnk_magazine_no86.pdf",
+      "url": "https://www.mingtiandi.com/real-estate/finance/mapletree-reit-merger-plan-triggers-moodys-review",
       "attributes": [
-        "INTERESTING_FACTS",
-        "KEY_POSITIONS"
+        "ADVERSE_NEWS",
+        "DATE_OF_ESTABLISHMENT"
       ],
       "coverage": 2
     },
     {
-      "url": "https://www.cna.org/reports/2024/03/PRC-Illicit-Malign-Activities-in-Africa.pdf",
+      "url": "https://www.fitchratings.com/research/corporate-finance/fitch-affirms-mapletree-industrial-trust-at-bbb-outlook-stable-05-08-2025",
       "attributes": [
         "ADVERSE_NEWS",
-        "KEY_POSITIONS"
+        "BIOGRAPHY"
       ],
       "coverage": 2
     }

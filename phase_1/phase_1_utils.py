@@ -3,12 +3,9 @@ import json
 import time
 import datetime
 import requests
-
-# ── CONFIG ────────────────────────────────────────────────────────────────────
-TINYFISH_API_KEY = "your_tinyfish_api_key_here"
-TAVILY_API_KEY   = "your_tavily_api_key_here"
-OLLAMA_URL       = "http://localhost:11434/api/chat"
-OLLAMA_MODEL     = "qwen2.5:7b"
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from config import TINYFISH_API_KEY, TAVILY_API_KEY, OLLAMA_URL, OLLAMA_MODEL
 CURRENT_YEAR     = datetime.date.today().year
 
 BAD_SOURCES = {
@@ -67,10 +64,14 @@ def ask_llm(prompt: str) -> str:
             resp = requests.post(
                 OLLAMA_URL,
                 json={
-                    "model": OLLAMA_MODEL,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "format": "json",
-                    "stream": False,
+                    "model":       OLLAMA_MODEL,
+                    "messages":    [{"role": "user", "content": prompt}],
+                    "format":      "json",
+                    "stream":      False,
+                    "options": {
+                        "temperature":  0,
+                        "num_predict":  200,
+                    }
                 },
                 timeout=120,
             )

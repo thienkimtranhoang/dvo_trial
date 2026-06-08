@@ -1,6 +1,6 @@
 import requests
 import concurrent.futures
-from config import TAVILY_API_KEY, BAD_SOURCES, build_queries
+import sys, os; sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..")); from config import TAVILY_API_KEY, BAD_SOURCES, build_queries
 
 
 def is_bad_source(url: str) -> bool:

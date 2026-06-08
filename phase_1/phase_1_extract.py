@@ -24,25 +24,41 @@ Field rules:
    "Published:", "Updated:", "Posted:", copyright notices, URL paths (e.g. /2023/), timestamps, photo captions.
    Examples: "Oct 23, 2011" → 2011, "August 7, 2020" → 2020, "/2023/" in URL → 2023.
    Return as 4-digit integer. You MUST return a year if ANY date exists on the page.
-4. nationality — SOVEREIGN COUNTRY NAME ONLY e.g. "Singapore", "China", "United States".
-   - NEVER return a province, state, city or region like "Shandong", "California", "Hong Kong Island".
-   - If text says "born in Shandong, China" return "China".
-   - If text says "Singaporean" return "Singapore".
-5. net_worth — PERSONAL net worth only as "$X Billion" or "$X Million".
-   - NEVER return company revenue, group assets, or market cap.
-   - If both personal and company figures appear, return only the personal one.
-6. net_worth_year — year the net worth figure is from as integer.
-7. degree — full formal degree name only, NO abbreviations, NO brackets, NO honours suffix.
-   - CORRECT: "Bachelor of Architecture", "Master of Business Administration", "Doctor of Philosophy"
-   - WRONG: "B.Arch", "MBA", "PhD", "Bachelor of Architecture (Honours)", "Undergraduate degree", "Architect"
-   - If the page mentions a degree, return the full formal name.
-8. institution — full official university name only.
-   - CORRECT: "University of Melbourne", "National University of Singapore"
-   - WRONG: "NUS", "Melbourne Uni", "the university"
-   - IMPORTANT: always look for the institution name in the SAME section as the degree on this page.
-   - If multiple institutions appear together e.g. "Catholic High School, University of Melbourne",
-     return ONLY the university name, not the school.
-   - A university contains words like "University", "College", "Institute of Technology", "School of Business".
+4. nationality — CURRENT CITIZENSHIP only, as a sovereign country name e.g. "Singapore", "China".
+   - NEVER return a province, state, city or region like "Shandong", "California", "Hong Kong".
+   - Nationality means CURRENT CITIZENSHIP — not birthplace.
+   - Someone can be born in China but be a Singaporean citizen — return Singapore in that case.
+   - Priority order (use highest available):
+     1. Explicit citizenship: "Singaporean citizen", "holds Singapore citizenship", "Singapore passport"
+     2. Official role implying citizenship: "Singapore's ambassador", "Singapore PR"
+     3. Long-term residence with context: "has lived in Singapore for X years", "based in Singapore since"
+     4. Birthplace only if nothing else found: "born in China"
+   - If page says "moved to Singapore" or "settled in Singapore" — strongly prefer Singapore over birthplace.
+   - NEVER infer nationality just because someone works or does business in a country.
+5. net_worth — PERSONAL net worth only formatted as "$X Billion" or "$X Million".
+   - Look carefully for ANY of these patterns:
+     * "net worth of $X", "worth $X billion", "estimated personal fortune of $X"
+     * "billionaire worth $X", "ranked X with wealth of $X"
+     * Forbes/Bloomberg personal wealth rankings with a dollar figure next to the person name
+   - CRITICAL: NEVER return project values, mine values, infrastructure costs or company revenues.
+     e.g. "The $23 billion Simandou project" is NOT personal net worth — it is a project value.
+     e.g. "Winning International Group revenue of $5 billion" is NOT personal net worth.
+     Only return a figure if it is explicitly described as the PERSON's personal wealth or net worth.
+   - If no clearly personal net worth figure exists on this page, return null.
+   - Normalise: always "$X Billion" or "$X Million" e.g. "$2.8 Billion".
+6. net_worth_year — the year the net worth figure was reported. Look for article date near the figure.
+7. degree — full formal degree name only, NO abbreviations, NO brackets.
+   - CORRECT: "Bachelor of Engineering", "Master of Business Administration", "Bachelor of Science in Maritime Studies"
+   - WRONG: "B.Eng", "MBA", "BSc", "Honours", "Undergraduate degree", "Diploma"
+   - Maritime schools: "studied at Jiangsu Maritime Institute" → degree "Bachelor of Maritime Studies", institution "Jiangsu Maritime Institute"
+   - Military colleges: "Anhui Military College" → degree "Military Science", institution "Anhui Military College"
+   - Vocational schools: if only a vocational/trade school is mentioned, still extract it with degree "Diploma"
+   - If only "graduated from X university" with no degree name → degree "Graduate", institution "X University"
+8. institution — full official name of the school, college or university.
+   - CORRECT: "University of Melbourne", "Jiangsu Maritime Institute", "Fudan University", "Anhui Military College"
+   - WRONG: "NUS", "Melbourne Uni", "the university", "his school"
+   - Extract the institution even if the degree type is unclear.
+   - If multiple schools mentioned, return the HIGHEST level (university beats high school).
 
 Return ONLY a JSON object, no explanation, no markdown:
 {{

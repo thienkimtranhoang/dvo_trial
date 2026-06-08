@@ -128,6 +128,11 @@ Rules:
 - If the company is provided and the page discusses that company AND the person together,
   that is a strong signal to return "yes"
 - If the name is common and the page gives no clear signals it's the right person, return "no"
+- IMPORTANT: If a company/organisation is provided, the page must be about the person in THAT
+  specific professional context. A page about a different person who happens to share the same
+  name but works in a completely different field/industry must be rejected.
+- Example: if researching "Jackie Chan" from "Winning International Group" (shipping company),
+  a page about the Hong Kong actor Jackie Chan must be rejected even though the name matches.
 
 You MUST respond with ONLY this exact JSON on a single line, nothing else — no preamble, no explanation, no markdown, no backticks:
 {{"is_valid": true, "confidence": "high", "reason": "your reason here"}}"""
@@ -195,37 +200,32 @@ def _parse_validation_response(raw: str):
 
 def validate_page(page: dict, name: str, company: str) -> dict:
     """
-    Validation flow:
-      1. Ask LLM -- if it parses cleanly, use that result
-      2. If LLM parse fails -> retry LLM once
-      3. If retry still fails -> fall back to heuristic validation
+    Validation flow (heuristic first for speed):
+      1. Run heuristic — if HIGH confidence, use result immediately (no LLM call)
+      2. If heuristic is MEDIUM/LOW — call LLM to decide
+      3. If LLM parse fails — use heuristic result as fallback
 
-    Returns the original page dict with new keys:
-      - "_valid"      : bool -- whether this page is about the right person
-      - "_confidence" : str  -- high / medium / low
-      - "_val_reason" : str  -- short explanation
-      - "_val_method" : str  -- "llm" or "heuristic" (for transparency)
+    This avoids LLM calls for clearly valid or clearly invalid pages,
+    significantly reducing validation time.
     """
-    url    = page["url"]
-    text   = page["text"]
-    prompt = _build_validation_prompt(name, company, url, text)
+    url  = page["url"]
 
-    # Attempt 1: LLM
-    raw = ask_llm(prompt)
-    is_valid, confidence, reason = _parse_validation_response(raw)
-    method = "llm"
+    # Step 1 — heuristic first
+    is_valid, confidence, reason = _heuristic_validate(page, name, company)
+    method = "heuristic"
 
-    # Attempt 2: LLM retry
-    if reason == "could not parse LLM response":
-        print(f"    [Validation] LLM parse failed for {url[:60]}... -- retrying")
-        raw = ask_llm(prompt)
-        is_valid, confidence, reason = _parse_validation_response(raw)
+    # Step 2 — only call LLM if heuristic is uncertain (medium/low confidence)
+    if confidence in ("medium", "low"):
+        prompt = _build_validation_prompt(name, company, url, page["text"])
+        raw    = ask_llm(prompt)
+        llm_valid, llm_confidence, llm_reason = _parse_validation_response(raw)
 
-    # Attempt 3: Heuristic fallback
-    if reason == "could not parse LLM response":
-        print(f"    [Validation] LLM retry failed -- falling back to heuristic for {url[:60]}...")
-        is_valid, confidence, reason = _heuristic_validate(page, name, company)
-        method = "heuristic"
+        if llm_reason != "could not parse LLM response":
+            is_valid   = llm_valid
+            confidence = llm_confidence
+            reason     = llm_reason
+            method     = "llm"
+        # else keep heuristic result
 
     return {
         **page,
@@ -246,7 +246,7 @@ def validate_all(pages: list, name: str, company: str = "") -> list:
     """
     print(f"\n  [Validation] Checking {len(pages)} pages are actually about '{name}'...")
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pages)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(pages))) as executor:
         results = list(executor.map(
             lambda p: validate_page(p, name, company),
             pages

@@ -44,16 +44,30 @@ def tf_fetch(url: str) -> dict | None:
     return None
 
 
-def run_tinyfish(name: str, company: str = None) -> list:
-    queries = [
-        f"{name} biography",
-        f"{name} age date of birth born",
-        f"{name} nationality citizenship country",
-        f"{name} personal net worth wealth",
-        f"{name} education university degree graduated",
-    ]
-    if company:
-        queries.append(f"{name} {company} background profile")
+FIELD_QUERIES = {
+    "age":         lambda n, c: f"{n}{c} age date of birth born year",
+    "nationality": lambda n, c: f"{n}{c} nationality citizenship country",
+    "net_worth":   lambda n, c: f"{n}{c} personal net worth wealth billion",
+    "education":   lambda n, c: f"{n}{c} education university degree graduated",
+}
+
+
+def run_tinyfish(name: str, company: str = None, fields: list = None) -> list:
+    c = f" {company}" if company else ""
+    # If specific fields requested, only run those queries
+    if fields:
+        queries = [FIELD_QUERIES[f](name, c) for f in fields if f in FIELD_QUERIES]
+        queries.append(f"{name}{c} biography")  # always include biography
+    else:
+        queries = [
+            f"{name}{c} biography",
+            f"{name}{c} age date of birth born",
+            f"{name}{c} nationality citizenship country",
+            f"{name}{c} personal net worth wealth",
+            f"{name}{c} education university degree graduated",
+        ]
+        if company:
+            queries.append(f"{name} {company} background profile")
 
     print(f"\n  [TinyFish] Searching the web — running {len(queries)} queries in parallel...")
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -101,18 +115,40 @@ def tv_search(label_query: tuple) -> list:
         return []
 
 
-def run_tavily(name: str, company: str = None) -> list:
-    queries = [
-        ("DOB",         f"{name} date of birth born year"),
-        ("DOB_SITE",    f"site:prabook.com {name}"),
-        ("NATIONALITY", f"{name} nationality citizenship"),
-        ("NET_WORTH",   f"{name} net worth wealth"),
-        ("EDUCATION",   f"{name} education university degree"),
-        ("EDU_SITE",    f"site:tatlerasia.com {name}"),
-        ("BIOGRAPHY",   f"{name} biography background"),
-    ]
-    if company:
-        queries.append(("COMPANY", f"{name} {company}"))
+TAVILY_FIELD_QUERIES = {
+    "age":         [("DOB", "{n}{c} date of birth born year"), ("DOB_SITE", "site:prabook.com {n}")],
+    "nationality": [
+        ("NATIONALITY",  "{n}{c} nationality citizenship country of origin"),
+        ("NAT_CITIZEN",  "{n}{c} citizen citizenship passport holds"),
+        ("NAT_PROFILE",  "{n}{c} profile biography born"),
+    ],
+    "net_worth":   [("NET_WORTH", "{n}{c} net worth billion million rich"), ("NET_WORTH2", "{n}{c} forbes bloomberg wealth ranking")],
+    "education":   [("EDUCATION", "{n}{c} education university degree graduated"), ("EDU_SITE", "site:tatlerasia.com {n}")],
+}
+
+
+def run_tavily(name: str, company: str = None, fields: list = None) -> list:
+    c = f" {company}" if company else ""
+    n = name
+
+    if fields:
+        queries = [("BIOGRAPHY", f"{n}{c} biography background")]
+        for f in fields:
+            for label, q_template in TAVILY_FIELD_QUERIES.get(f, []):
+                queries.append((label, q_template.format(n=n, c=c)))
+    else:
+        queries = [
+            ("DOB",         f"{n}{c} date of birth born year"),
+            ("DOB_SITE",    f"site:prabook.com {n}"),
+            ("NATIONALITY", f"{n}{c} nationality citizenship"),
+            ("NET_WORTH",   f"{n}{c} net worth billion million rich"),
+            ("NET_WORTH2",  f"{n}{c} forbes bloomberg wealth ranking"),
+            ("EDUCATION",   f"{n}{c} education university degree graduated"),
+            ("EDU_SITE",    f"site:tatlerasia.com {n}"),
+            ("BIOGRAPHY",   f"{n}{c} biography background"),
+        ]
+        if company:
+            queries.append(("COMPANY", f"{n} {company}"))
 
     print(f"\n  [Tavily] Searching for snippets — running {len(queries)} targeted queries in parallel...")
     with concurrent.futures.ThreadPoolExecutor() as executor:
