@@ -81,3 +81,35 @@ def ask_llm(prompt: str) -> str:
                 return ""
             time.sleep(3)
     return ""
+
+def ask_llm_validate(prompt: str) -> str:
+    for attempt in range(3):
+        try:
+            resp = requests.post(
+                OLLAMA_URL,
+                json={
+                    "model":    OLLAMA_MODEL,
+                    "messages": [
+                        {"role": "system", "content": "Respond with JSON only. No explanation."},
+                        {"role": "user",   "content": prompt}
+                    ],
+                    "format": "json",
+                    "stream": False,
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            content = resp.json()["message"]["content"].strip()
+            if content:
+                return content
+            print(f"    [ask_llm] Empty content in response (attempt {attempt + 1})")
+            return ""
+        except requests.exceptions.Timeout:
+            print(f"    [ask_llm] TIMEOUT on attempt {attempt + 1} — model overloaded")
+        except requests.exceptions.ConnectionError as e:
+            print(f"    [ask_llm] CONNECTION ERROR on attempt {attempt + 1}: {e}")
+        except Exception as e:
+            print(f"    [ask_llm] ERROR on attempt {attempt + 1}: {type(e).__name__}: {e}")
+        if attempt < 2:
+            time.sleep(3)
+    return ""
