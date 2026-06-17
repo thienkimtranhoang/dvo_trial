@@ -4,7 +4,7 @@ import re
 import json
 import concurrent.futures
 import time
-from phase_2_utils import ask_llm, ask_llm_validate
+from phase_2_utils import ask_llm_validate
 
 # BIO KEYWORDS FOR HEURISTIC CHECK
 BIO_KEYWORDS = [
@@ -100,23 +100,25 @@ def _heuristic_validate(url: str, snippet: str, name: str, company: str) -> tupl
 # LLM VALIDATION
 # ─────────────────────────────────────────────────────────────────────────────
 def _build_validation_prompt(name: str, company: str, url: str, snippet: str) -> str:
-    company_line = f"Company: {company}\n" if company else ""
-    name_parts = name.strip().split()
-    short_form  = " ".join(name_parts[:2]) if len(name_parts) > 2 else None
-    disambiguation = f"""
-CRITICAL DISAMBIGUATION RULE:
-- Do NOT infer or guess that a different person "could be" or "might be" {name}.
-- When in doubt, return false. Only return true if you are certain.
-The full name is "{name}". This person may also appear as "{short_form}" in some sources.
-- If the snippet only mentions "{short_form}" (without further context linking to THIS specific individual), return false.
-- Only return true if the snippet mentions the FULL name "{name}", OR clearly identifies this specific person via role/company/other unique details that match known facts about them.
-- Do NOT assume "{short_form}" = "{name}" without corroborating evidence in the snippet itself.
-""" if short_form and short_form.lower() != name.lower() else ""
-    return f"""Does this snippet contain information about {name}?
-{company_line}{disambiguation}URL: {url}
-Snippet: {snippet[:200]}
+    source_text = (snippet or "").strip()
 
-Return JSON only: {{"is_valid": true, "confidence": "high", "reason": "..."}}"""
+    return f"""Validate whether this search result is about the target person.
+
+Target person: {name}
+Known company/context: {company or "none provided"}
+URL: {url}
+Snippet: {source_text[:700]}
+
+Decide identity only. Ignore whether the topic would be useful for any downstream profile section.
+
+Use semantic identity, not only exact string matching:
+- Accept exact names or supported name variants/aliases when nearby context identifies the same person.
+- Reject isolated partial-name matches.
+- Reject same-name/different-person cases when role, organisation, topic, geography, or life details point elsewhere.
+- Do not claim evidence that is not in the URL/snippet.
+
+Return JSON only:
+{{"is_valid": true, "confidence": "high", "reason": "...", "identity_evidence": "...", "negative_evidence": null}}"""
 
 
 def _parse_validation_response(raw: str):
