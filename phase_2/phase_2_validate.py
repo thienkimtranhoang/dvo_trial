@@ -4,7 +4,7 @@ import re
 import json
 import concurrent.futures
 import time
-from phase_2_utils import ask_llm_validate
+from phase_2_utils import ask_llm, ask_llm_validate
 
 # BIO KEYWORDS FOR HEURISTIC CHECK
 BIO_KEYWORDS = [
@@ -15,6 +15,7 @@ BIO_KEYWORDS = [
 ]
 
 FALLBACK_REASONS = {"could not parse LLM response", "empty LLM response"}
+USE_IDENTITY_ANCHORS = True
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HEURISTIC VALIDATION
@@ -207,6 +208,435 @@ def _parse_validation_response(raw: str):
 # ─────────────────────────────────────────────────────────────────────────────
 # RECONCILIATION — combine LLM + heuristic verdicts
 # ─────────────────────────────────────────────────────────────────────────────
+def _norm_text(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).strip()
+
+
+def _name_parts(name: str) -> list[str]:
+    return [p for p in _norm_text(name).split() if len(p) > 2]
+
+
+def _name_signal(url: str, snippet: str, name: str) -> dict:
+    text = _norm_text(f"{url} {snippet}")
+    parts = _name_parts(name)
+    if not parts:
+        return {"strong": False, "partial": False, "hits": []}
+
+    full_name = " ".join(parts)
+    reversed_name = " ".join(reversed(parts))
+    hits = [p for p in parts if re.search(rf"\b{re.escape(p)}\b", text)]
+    strong = (
+        bool(full_name and full_name in text)
+        or bool(reversed_name and reversed_name in text)
+        or len(hits) >= min(len(parts), 3)
+    )
+    partial = len(hits) >= min(len(parts), 2)
+    return {"strong": strong, "partial": partial, "hits": hits}
+
+
+def _parse_json_dict(raw: str) -> dict:
+    if not raw or not raw.strip():
+        return {}
+    cleaned = re.sub(r"```json|```", "", raw).strip()
+    try:
+        parsed = json.loads(cleaned)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        pass
+    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if match:
+        try:
+            parsed = json.loads(match.group())
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            pass
+    return {}
+
+
+def _build_anchor_extraction_prompt(name: str, company: str, seed_sources: list[dict]) -> str:
+    source_blocks = []
+    for i, src in enumerate(seed_sources, 1):
+        source_blocks.append(
+            f"SOURCE {i}\nURL: {src['url']}\nSNIPPET: {src['snippet'][:700]}"
+        )
+
+    return f"""Extract a generic identity profile for the target person from trusted seed sources.
+
+Target person: {name}
+Known company/context: {company or "none provided"}
+
+Seed sources:
+{chr(10).join(source_blocks)}
+
+Extract only source-supported identity anchors that can disambiguate this person from same-name people.
+Prefer specific organisations, companies, foundations, named institutions, roles with organisations,
+industries/domains, geography, family/company relationships, and name variants.
+Also include distinctive identity descriptors that help disambiguation, such as source-supported
+industry descriptors, property/business labels, philanthropic/art foundations, and named personal
+projects. Do not include generic titles by themselves unless tied to a specific organisation or
+clearly distinctive source context.
+
+Return JSON only:
+{{
+  "name_variants": [],
+  "organisations": [],
+  "companies": [],
+  "foundations": [],
+  "roles_titles": [],
+  "industries_domains": [],
+  "locations": [],
+  "family_or_relationships": [],
+  "other_identity_anchors": []
+}}"""
+
+
+def _extract_anchor_profile(name: str, company: str, seed_sources: list[dict]) -> dict:
+    if not seed_sources:
+        return {}
+    raw = ask_llm(_build_anchor_extraction_prompt(name, company, seed_sources))
+    profile = _parse_json_dict(raw)
+    if not profile:
+        return {}
+    return {
+        key: value
+        for key, value in profile.items()
+        if isinstance(value, list) and value
+    }
+
+
+def _build_identity_profile(
+    val_results: list[tuple[str, dict]],
+    url_to_sample: dict,
+    name: str,
+    company: str,
+    max_seed_sources: int = 3,
+) -> dict:
+    seed_urls = []
+    seed_sources = []
+
+    for url, val in val_results:
+        if len(seed_urls) >= max_seed_sources:
+            break
+        if not val.get("_valid") or val.get("_confidence") == "low":
+            continue
+
+        snippet = url_to_sample[url].get("snippet", "")
+        signal = _name_signal(url, snippet, name)
+        if not signal["strong"]:
+            continue
+
+        seed_urls.append(url)
+        seed_sources.append({"url": url, "snippet": snippet})
+
+    anchors = _extract_anchor_profile(name, company, seed_sources)
+    return {"anchors": anchors, "seed_urls": seed_urls, "seed_sources": seed_sources}
+
+
+def _build_anchor_arbitration_prompt(
+    name: str,
+    company: str,
+    profile: dict,
+    url: str,
+    snippet: str,
+    current_reason: str,
+) -> str:
+    seed_blocks = []
+    for i, src in enumerate(profile.get("seed_sources", []), 1):
+        seed_blocks.append(
+            f"SEED {i}\nURL: {src.get('url', '')}\nSNIPPET: {src.get('snippet', '')[:700]}"
+        )
+
+    return f"""Resolve whether a candidate search result is about the same target person.
+
+Target person: {name}
+Known company/context: {company or "none provided"}
+
+Identity anchors extracted from stronger seed sources:
+{json.dumps(profile.get("anchors", {}), ensure_ascii=False, indent=2)}
+
+Trusted seed evidence excerpts:
+{chr(10).join(seed_blocks)}
+
+Candidate URL: {url}
+Candidate snippet: {(snippet or "")[:900]}
+Current validation reason: {current_reason}
+
+Use the anchors semantically. For partial-name candidates, accept only if the candidate matches
+specific anchor evidence such as organisation, company, foundation, role+organisation, industry,
+location, relationship, or a clearly equivalent identity detail. Reject same-name/different-person
+cases even if the topic seems profile-relevant.
+
+If an exact anchor value appears in the candidate URL/snippet, put that exact value in matched_anchors.
+If the candidate is valid by semantic identity evidence but does not use the exact anchor wording,
+use evidence_bridge with:
+- supporting_anchor: exact anchor value from the identity profile that the seed evidence supports
+- candidate_evidence: exact short phrase copied from the candidate URL/snippet
+- seed_evidence: exact short phrase copied from the trusted seed excerpts
+- evidence_type: organisation, role, industry, location, relationship, project, foundation, or other
+
+Do not use the target name alone as evidence. Do not return category names like "organisations",
+"companies", "name", or "roles_titles" as matched anchors.
+
+Return JSON only:
+{{"is_valid": true, "confidence": "high", "matched_anchors": [], "evidence_bridge": {{"supporting_anchor": "", "candidate_evidence": "", "seed_evidence": "", "evidence_type": ""}}, "reason": "..."}}"""
+
+
+def _anchor_arbitration_decision(
+    name: str,
+    company: str,
+    profile: dict,
+    url: str,
+    snippet: str,
+    current_reason: str,
+) -> tuple:
+    t0 = time.time()
+    raw = ask_llm_validate(
+        _build_anchor_arbitration_prompt(name, company, profile, url, snippet, current_reason)
+    )
+    elapsed = time.time() - t0
+    print(f"    [Anchor Arbitration] {elapsed:.1f}s for {url[:70]}")
+    parsed = _parse_json_dict(raw)
+    if not parsed:
+        return None, "low", "could not parse anchor arbitration response", [], {}
+
+    raw_val = parsed.get("is_valid", parsed.get("valid", False))
+    is_valid = raw_val.lower().strip() in ("true", "yes", "1") if isinstance(raw_val, str) else bool(raw_val)
+    confidence = str(parsed.get("confidence", "medium")).lower()
+    if confidence not in ("high", "medium", "low"):
+        confidence = "medium"
+    reason = str(parsed.get("reason", "anchor arbitration parsed ok"))
+    matched = parsed.get("matched_anchors", [])
+    if not isinstance(matched, list):
+        matched = [str(matched)] if matched else []
+    evidence_bridge = parsed.get("evidence_bridge", {})
+    if not isinstance(evidence_bridge, dict):
+        evidence_bridge = {}
+    return is_valid, confidence, reason, matched, evidence_bridge
+
+
+def _flatten_anchor_values(anchors: dict) -> list[tuple[str, str]]:
+    values = []
+
+    def collect(item, category=""):
+        if isinstance(item, str):
+            if item.strip():
+                values.append((category, item.strip()))
+        elif isinstance(item, list):
+            for sub_item in item:
+                collect(sub_item, category)
+        elif isinstance(item, dict):
+            for key, sub_item in item.items():
+                collect(sub_item, str(key))
+
+    collect(anchors)
+    return values
+
+
+def _anchor_lookup(profile: dict) -> dict:
+    lookup = {}
+    for category, value in _flatten_anchor_values(profile.get("anchors", {})):
+        normalised = _norm_text(value)
+        if normalised:
+            lookup[normalised] = {"category": category, "value": value}
+    return lookup
+
+
+def _verified_anchor_matches(profile: dict, matched: list, url: str, snippet: str) -> list[str]:
+    anchors = profile.get("anchors", {})
+    category_names = {_norm_text(k) for k in anchors.keys()}
+    candidate_text = _norm_text(f"{url} {snippet}")
+    anchor_map = _anchor_lookup(profile)
+
+    verified = []
+
+    def add_match(normalised: str):
+        if not normalised or normalised in category_names:
+            return
+        if normalised in anchor_map and normalised in candidate_text:
+            value = anchor_map[normalised]["value"]
+            if value not in verified:
+                verified.append(value)
+
+    for item in matched:
+        add_match(_norm_text(str(item)))
+
+    # Do not rely only on the LLM copying matched_anchors correctly; scan directly too.
+    for normalised in anchor_map:
+        add_match(normalised)
+
+    return verified
+
+
+EVIDENCE_STOPWORDS = {
+    "the", "and", "for", "with", "from", "that", "this", "into", "about", "his",
+    "her", "their", "they", "them", "who", "has", "had", "was", "were", "are",
+    "also", "will", "would", "could", "should", "mr", "mrs", "ms", "dr",
+}
+
+
+def _collect_strings(value) -> list[str]:
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    if isinstance(value, list):
+        strings = []
+        for item in value:
+            strings.extend(_collect_strings(item))
+        return strings
+    if isinstance(value, dict):
+        strings = []
+        for item in value.values():
+            strings.extend(_collect_strings(item))
+        return strings
+    return []
+
+
+def _quote_supported(quote: str, text: str) -> bool:
+    quote_norm = _norm_text(quote)
+    text_norm = _norm_text(text)
+    if not quote_norm or not text_norm:
+        return False
+    if quote_norm in text_norm:
+        return True
+
+    tokens = [t for t in quote_norm.split() if len(t) > 2]
+    if len(tokens) < 4:
+        return False
+    hits = sum(1 for token in tokens if re.search(rf"\b{re.escape(token)}\b", text_norm))
+    return hits / len(tokens) >= 0.8
+
+
+def _has_non_name_signal(text: str, name: str) -> bool:
+    name_tokens = set(_name_parts(name))
+    tokens = [
+        token
+        for token in _norm_text(text).split()
+        if len(token) > 2 and token not in name_tokens and token not in EVIDENCE_STOPWORDS
+    ]
+    return len(tokens) >= 2 or any(len(token) > 6 for token in tokens)
+
+
+def _verified_evidence_bridge(
+    profile: dict,
+    evidence_bridge: dict,
+    url: str,
+    snippet: str,
+    name: str,
+) -> tuple[bool, str]:
+    supporting_anchor = str(evidence_bridge.get("supporting_anchor", "")).strip()
+    if not supporting_anchor:
+        return False, ""
+
+    anchor = _anchor_lookup(profile).get(_norm_text(supporting_anchor))
+    if not anchor or anchor["category"] == "name_variants":
+        return False, ""
+
+    candidate_text = f"{url} {snippet}"
+    seed_text = " ".join(
+        f"{src.get('url', '')} {src.get('snippet', '')}"
+        for src in profile.get("seed_sources", [])
+    )
+
+    candidate_quotes = _collect_strings(evidence_bridge.get("candidate_evidence"))
+    seed_quotes = _collect_strings(evidence_bridge.get("seed_evidence"))
+    candidate_ok = any(
+        _quote_supported(quote, candidate_text) and _has_non_name_signal(quote, name)
+        for quote in candidate_quotes
+    )
+    seed_ok = any(
+        _quote_supported(quote, seed_text) and _has_non_name_signal(quote, name)
+        for quote in seed_quotes
+    )
+    anchor_supported_by_seed = any(
+        _quote_supported(supporting_anchor, quote) or _quote_supported(supporting_anchor, seed_text)
+        for quote in seed_quotes
+    )
+
+    evidence_type = str(evidence_bridge.get("evidence_type", "")).lower().strip()
+    weak_types = {"", "none", "name", "name_only", "same_name"}
+    if candidate_ok and seed_ok and anchor_supported_by_seed and evidence_type not in weak_types:
+        return True, supporting_anchor
+    return False, ""
+
+
+def _apply_identity_anchor_gate(
+    url: str,
+    val: dict,
+    url_to_sample: dict,
+    name: str,
+    company: str,
+    profile: dict,
+) -> dict:
+    if not profile.get("seed_urls") or not profile.get("anchors"):
+        return val
+
+    snippet = url_to_sample[url].get("snippet", "")
+    signal = _name_signal(url, snippet, name)
+
+    llm_valid = val.get("_llm_valid")
+    heur_valid = val.get("_heur_valid")
+    has_vote_conflict = llm_valid is not None and heur_valid is not None and llm_valid != heur_valid
+    if signal["strong"] and not has_vote_conflict:
+        return val
+
+    needs_anchor_check = has_vote_conflict or (signal["partial"] and val.get("_valid"))
+    if not needs_anchor_check:
+        return val
+
+    anchor_valid, anchor_conf, anchor_reason, matched, evidence_bridge = _anchor_arbitration_decision(
+        name,
+        company,
+        profile,
+        url,
+        snippet,
+        val.get("_val_reason", ""),
+    )
+
+    if anchor_valid is None:
+        if val.get("_valid"):
+            gated = dict(val)
+            gated["_valid"] = False
+            gated["_confidence"] = "low"
+            gated["_val_reason"] = (
+                "[anchor-review] partial-name result needed anchor arbitration, "
+                "but arbitration failed to parse"
+            )
+            gated["_val_method"] = f"{val.get('_val_method', 'validation')}+anchors"
+            return gated
+        return val
+
+    verified_matches = _verified_anchor_matches(profile, matched, url, snippet)
+    bridge_valid, bridge_anchor = _verified_evidence_bridge(
+        profile,
+        evidence_bridge,
+        url,
+        snippet,
+        name,
+    )
+    if anchor_valid and not verified_matches and not bridge_valid:
+        anchor_valid = False
+        anchor_conf = "low"
+        anchor_reason = (
+            "Anchor arbitration accepted the source, but returned no concrete "
+            "matched anchor values or verifiable seed/candidate evidence bridge"
+        )
+
+    gated = dict(val)
+    gated["_valid"] = anchor_valid
+    gated["_confidence"] = anchor_conf
+    if anchor_valid and verified_matches:
+        anchor_tag = "anchor-pass"
+        matched_text = f" matched={verified_matches[:3]}"
+    elif anchor_valid and bridge_valid:
+        anchor_tag = "anchor-pass-evidence"
+        matched_text = f" evidence_anchor={bridge_anchor}"
+    else:
+        anchor_tag = "anchor-reject"
+        matched_text = f" matched={verified_matches[:3]}" if verified_matches else ""
+    gated["_val_reason"] = f"[{anchor_tag}] {anchor_reason}{matched_text}"
+    gated["_val_method"] = f"{val.get('_val_method', 'validation')}+anchors"
+    return gated
+
+
 CONF_RANK = {"high": 3, "medium": 2, "low": 1}
 
 def _reconcile(
@@ -269,6 +699,10 @@ def _validate_url(url: str, snippet: str, name: str, company: str) -> dict:
         "_confidence": confidence,
         "_val_reason": reason,
         "_val_method": method,
+        "_llm_valid":  llm_valid,
+        "_llm_conf":   llm_conf,
+        "_heur_valid": heur_valid,
+        "_heur_conf":  heur_conf,
     }
 
 
@@ -324,6 +758,34 @@ def run(results: list, name: str, company: str = "") -> tuple:
         val = _validate_url(url, snippet, name, company)
         val_results.append((url, val))
         time.sleep(0.3)
+
+    if USE_IDENTITY_ANCHORS:
+        t_anchor = time.time()
+        identity_profile = _build_identity_profile(val_results, url_to_sample, name, company)
+        print(f"  [Timer] Anchor profile extraction: {time.time() - t_anchor:.1f}s")
+        if identity_profile["seed_urls"]:
+            anchor_count = sum(len(v) for v in identity_profile.get("anchors", {}).values())
+            print(
+                f"  [Identity Anchors] {len(identity_profile['seed_urls'])} seed sources, "
+                f"{anchor_count} semantic anchors"
+            )
+            for category, values in identity_profile.get("anchors", {}).items():
+                if values:
+                    print(f"    - {category}: {', '.join(str(v) for v in values)}")
+            t_anchor_gate = time.time()
+            val_results = [
+                (
+                    url,
+                    _apply_identity_anchor_gate(url, val, url_to_sample, name, company, identity_profile),
+                )
+                for url, val in val_results
+            ]
+            print(f"  [Timer] Anchor arbitration/gating: {time.time() - t_anchor_gate:.1f}s")
+            print(f"  [Timer] Identity anchors total: {time.time() - t_anchor:.1f}s")
+        else:
+            print("  [Identity Anchors] No strong seed sources found; skipping anchor gate")
+    else:
+        print("  [Identity Anchors] Disabled (set USE_IDENTITY_ANCHORS = True to enable)")
 
     # Build cache
     url_cache = {url: val for url, val in val_results}
