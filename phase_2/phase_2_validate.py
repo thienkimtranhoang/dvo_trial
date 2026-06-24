@@ -118,8 +118,21 @@ Use semantic identity, not only exact string matching:
 - Reject same-name/different-person cases when role, organisation, topic, geography, or life details point elsewhere.
 - Do not claim evidence that is not in the URL/snippet.
 
+Check three things:
+- Name evidence: full name, reversed name, initials, or a credible alias.
+- Context evidence: company, role/title, biography details, dates, locations, or source domain.
+- Conflict evidence: different employer/title, unrelated topic, or another person with the same/similar name.
+
+Confidence guide:
+- high: clear name + context evidence, with no meaningful conflict.
+- medium: likely same person, but evidence is partial.
+- low: weak, ambiguous, passing mention, or conflicting evidence.
+
+If the snippet is only a directory/search/listing result, return true only when it clearly identifies the target person.
+
 Return JSON only:
 {{"is_valid": true, "confidence": "high", "reason": "...", "identity_evidence": "...", "negative_evidence": null}}"""
+
 
 
 def _parse_validation_response(raw: str):
@@ -558,6 +571,14 @@ def _verified_evidence_bridge(
     return False, ""
 
 
+def _has_vote_conflict(val: dict) -> bool:
+    llm_valid = val.get("_llm_valid")
+    heur_valid = val.get("_heur_valid")
+    if llm_valid is not None and heur_valid is not None:
+        return llm_valid != heur_valid
+    return str(val.get("_val_reason", "")).lstrip().startswith("[conflict]")
+
+
 def _apply_identity_anchor_gate(
     url: str,
     val: dict,
@@ -569,19 +590,10 @@ def _apply_identity_anchor_gate(
     if not profile.get("seed_urls") or not profile.get("anchors"):
         return val
 
+    if not _has_vote_conflict(val):
+        return val
+
     snippet = url_to_sample[url].get("snippet", "")
-    signal = _name_signal(url, snippet, name)
-
-    llm_valid = val.get("_llm_valid")
-    heur_valid = val.get("_heur_valid")
-    has_vote_conflict = llm_valid is not None and heur_valid is not None and llm_valid != heur_valid
-    if signal["strong"] and not has_vote_conflict:
-        return val
-
-    needs_anchor_check = has_vote_conflict or (signal["partial"] and val.get("_valid"))
-    if not needs_anchor_check:
-        return val
-
     anchor_valid, anchor_conf, anchor_reason, matched, evidence_bridge = _anchor_arbitration_decision(
         name,
         company,
@@ -592,17 +604,15 @@ def _apply_identity_anchor_gate(
     )
 
     if anchor_valid is None:
-        if val.get("_valid"):
-            gated = dict(val)
-            gated["_valid"] = False
-            gated["_confidence"] = "low"
-            gated["_val_reason"] = (
-                "[anchor-review] partial-name result needed anchor arbitration, "
-                "but arbitration failed to parse"
-            )
-            gated["_val_method"] = f"{val.get('_val_method', 'validation')}+anchors"
-            return gated
-        return val
+        gated = dict(val)
+        gated["_valid"] = False
+        gated["_confidence"] = "low"
+        gated["_val_reason"] = (
+            "[anchor-review] conflicting LLM/heuristic result needed anchor arbitration, "
+            "but arbitration failed to parse"
+        )
+        gated["_val_method"] = f"{val.get('_val_method', 'validation')}+anchors"
+        return gated
 
     verified_matches = _verified_anchor_matches(profile, matched, url, snippet)
     bridge_valid, bridge_anchor = _verified_evidence_bridge(
@@ -751,6 +761,7 @@ def run(results: list, name: str, company: str = "") -> tuple:
 
     # Sequential — one LLM call at a time to avoid overloading Ollama
     # Heuristic runs in parallel with each LLM call inside _validate_url
+    t_validate = time.time()
     val_results = []
     for i, url in enumerate(unique_urls):
         snippet = url_to_sample[url].get("snippet", "")
@@ -758,32 +769,37 @@ def run(results: list, name: str, company: str = "") -> tuple:
         val = _validate_url(url, snippet, name, company)
         val_results.append((url, val))
         time.sleep(0.3)
+    print(f"  [Timer] Validation only: {time.time() - t_validate:.1f}s")
 
     if USE_IDENTITY_ANCHORS:
-        t_anchor = time.time()
-        identity_profile = _build_identity_profile(val_results, url_to_sample, name, company)
-        print(f"  [Timer] Anchor profile extraction: {time.time() - t_anchor:.1f}s")
-        if identity_profile["seed_urls"]:
-            anchor_count = sum(len(v) for v in identity_profile.get("anchors", {}).values())
-            print(
-                f"  [Identity Anchors] {len(identity_profile['seed_urls'])} seed sources, "
-                f"{anchor_count} semantic anchors"
-            )
-            for category, values in identity_profile.get("anchors", {}).items():
-                if values:
-                    print(f"    - {category}: {', '.join(str(v) for v in values)}")
-            t_anchor_gate = time.time()
-            val_results = [
-                (
-                    url,
-                    _apply_identity_anchor_gate(url, val, url_to_sample, name, company, identity_profile),
+        conflict_count = sum(1 for _, val in val_results if _has_vote_conflict(val))
+        if conflict_count:
+            t_anchor = time.time()
+            identity_profile = _build_identity_profile(val_results, url_to_sample, name, company)
+            print(f"  [Timer] Anchor profile extraction: {time.time() - t_anchor:.1f}s")
+            if identity_profile["seed_urls"]:
+                anchor_count = sum(len(v) for v in identity_profile.get("anchors", {}).values())
+                print(
+                    f"  [Identity Anchors] {len(identity_profile['seed_urls'])} seed sources, "
+                    f"{anchor_count} semantic anchors for {conflict_count} conflict URLs"
                 )
-                for url, val in val_results
-            ]
-            print(f"  [Timer] Anchor arbitration/gating: {time.time() - t_anchor_gate:.1f}s")
-            print(f"  [Timer] Identity anchors total: {time.time() - t_anchor:.1f}s")
+                for category, values in identity_profile.get("anchors", {}).items():
+                    if values:
+                        print(f"    - {category}: {', '.join(str(v) for v in values)}")
+                t_anchor_gate = time.time()
+                val_results = [
+                    (
+                        url,
+                        _apply_identity_anchor_gate(url, val, url_to_sample, name, company, identity_profile),
+                    )
+                    for url, val in val_results
+                ]
+                print(f"  [Timer] Anchor arbitration/gating: {time.time() - t_anchor_gate:.1f}s")
+                print(f"  [Timer] Identity anchors total: {time.time() - t_anchor:.1f}s")
+            else:
+                print("  [Identity Anchors] No strong seed sources found; skipping anchor gate")
         else:
-            print("  [Identity Anchors] No strong seed sources found; skipping anchor gate")
+            print("  [Identity Anchors] No LLM/heuristic conflicts found; skipping anchor gate")
     else:
         print("  [Identity Anchors] Disabled (set USE_IDENTITY_ANCHORS = True to enable)")
 
